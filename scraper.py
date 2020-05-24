@@ -1,5 +1,6 @@
 
 import pandas as pd
+import matplotlib
 from datetime import datetime
 
 
@@ -23,10 +24,16 @@ class Yahoo_Finscraper:
         self.period_start = period_start
         self.period_end = period_end
 
-        self.request_url = "https://finance.yahoo.com/quote/{sname}/history?period1" \
+        base_url = "https://finance.yahoo.com/quote/"
+        self.request_url = base_url + "{sname}/history?period1" \
                       "={p_start}&period2={p_end}&interval=1d&filter=history&frequency=1d".format(sname=self.share_name_short,
                                                                                                   p_start=to_unix_time(self.period_start),
-                                                                                                  p_end=to_unix_time(self.period_end))
+                                                                                                   p_end=to_unix_time(self.period_end))
+        ## fetch data
+        ## TODO: if multiple tables -> concat tables or specify
+        data = pd.read_html(self.request_url)[0]
+
+        self.share_values, self.dividend = self.to_df(data)
 
     def show_description(self):
 
@@ -38,20 +45,49 @@ class Yahoo_Finscraper:
         print(descr_dict)
 
 
-    def fetch_data(self):
+    def to_df(self, data):
 
-        data = pd.read_html(self.request_url)[0]
+        ## delete last row with additional informations
+        data = data[:-1].copy()
 
-        ## TODO: if multiple tables -> concat tables or specify
+        ## set date column with datetype
+        data["Date"] = pd.to_datetime(data["Date"], format="%b %d, %Y")  # Format: May 15, 2020
 
-        return data
+        ## share value and dividend payment are on the same date
+        dub = data.duplicated(subset="Date", keep="first")
+
+        ## format dividend payments as a separat timeseries
+        dividend = data[dub][["Date", "Open"]].copy()
+
+        dividend["Dividend"] = dividend["Open"].apply(lambda x: float(x.split(" ")[0]))
+
+        dividend = dividend.drop(columns=["Open"])
+
+        dividend = dividend.set_index("Date")
+
+        ## keep share_values in a df without dividend payments
+        share_values = data.drop(data[dub].index)
+
+        mapper = {"Close*": "Close", "Adj Close**": "Adj_Close"}
+        share_values = share_values.rename(columns=mapper)
 
 
-    def get_dividend():
+        share_values = share_values.set_index("Date")
 
-        return "pandas dataframe"
+        float_columns = ["Open", "High", "Low", "Close", "Adj_Close"]
+        share_values[float_columns] = share_values[float_columns].astype(float)
+        share_values["Volume"] = share_values["Volume"].astype(int)
 
+        return share_values, dividend
 
-    def get_value_series():
+    def get_dividend(self):
 
-        return "pandas dataframe"
+        return self.dividend
+
+    def get_share_values(self):
+
+        return self.share_values
+
+    def show_visualizations(self):
+
+        self.share_values["Open"].plot()
