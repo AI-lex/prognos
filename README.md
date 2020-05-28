@@ -1,2 +1,2 @@
 # prognos
-a test project to getting warm with time series predictions
+a test project to get warm with time series predictions and finance data 
