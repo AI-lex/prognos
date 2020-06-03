@@ -1,6 +1,6 @@
 
 import pandas as pd
-import matplotlib
+import matplotlib.pyplot as plt
 from datetime import datetime
 
 
@@ -28,7 +28,7 @@ class Yahoo_Finscraper:
         self.request_url = base_url + "{sname}/history?period1" \
                       "={p_start}&period2={p_end}&interval=1d&filter=history&frequency=1d".format(sname=self.share_name_short,
                                                                                                   p_start=to_unix_time(self.period_start),
-                                                                                                   p_end=to_unix_time(self.period_end))
+                                                                                         p_end=to_unix_time(self.period_end))
         ## fetch data
         ## TODO: if multiple tables -> concat tables or specify
         data = pd.read_html(self.request_url)[0]
@@ -91,3 +91,11 @@ class Yahoo_Finscraper:
     def show_visualizations(self):
 
         self.share_values["Open"].plot()
+        plt.show()
+
+    def download_file(self):
+
+        #TODO download an read file
+
+        # link: https://query1.finance.yahoo.com/v7/finance/download/AAPL?period1=345427200&period2=1590883200&interval=1d&events=history
+

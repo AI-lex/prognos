@@ -1,12 +1,10 @@
 
-import pandas as pd
+
 from scraper import Yahoo_Finscraper
 
 
-yfs = Yahoo_Finscraper("AAPL", "Apple", "15.03.2020", "22.05.2020")
+yfs = Yahoo_Finscraper("AAPL", "Apple", "15.03.2018", "22.05.2020")
 
-
-yfs.show_description()
 
 print(yfs.request_url)
 
