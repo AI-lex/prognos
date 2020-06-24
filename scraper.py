@@ -2,38 +2,40 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+from io import BytesIO
+import requests
 
 
-def to_unix_time(date_string):
+def to_datetime(date_string):
 
     date_string_list = date_string.split(".")
     day = int(date_string_list[0])
     month = int(date_string_list[1])
     year = int(date_string_list[2])
 
-    x = datetime(year, month, day)
-
-    return int(x.timestamp())
-
+    return datetime(year, month, day)
 
 
 class Yahoo_Finscraper:
     def __init__(self, share_name_short, share_name_long, period_start, period_end):
         self.share_name_short = share_name_short
         self.share_name_long = share_name_long
-        self.period_start = period_start
-        self.period_end = period_end
+        self.period_start = to_datetime(period_start)
+        self.period_end = to_datetime(period_end)
+        self.timespan = self.period_end - self.period_start
 
-        base_url = "https://finance.yahoo.com/quote/"
-        self.request_url = base_url + "{sname}/history?period1" \
-                      "={p_start}&period2={p_end}&interval=1d&filter=history&frequency=1d".format(sname=self.share_name_short,
-                                                                                                  p_start=to_unix_time(self.period_start),
-                                                                                         p_end=to_unix_time(self.period_end))
-        ## fetch data
-        ## TODO: if multiple tables -> concat tables or specify
-        data = pd.read_html(self.request_url)[0]
+        base_url = "https://query1.finance.yahoo.com/v7/finance/download/"
 
-        self.share_values, self.dividend = self.to_df(data)
+
+
+        self.request_url = self.build_request_url(base_url)
+
+        ## fetch share values and dividend payment
+        self.share_values, self.dividend = self.fetch_data(self.request_url)
+
+
+
+
 
     def show_description(self):
 
@@ -44,41 +46,19 @@ class Yahoo_Finscraper:
                       }
         print(descr_dict)
 
-
-    def to_df(self, data):
-
-        ## delete last row with additional informations
-        data = data[:-1].copy()
-
-        ## set date column with datetype
-        data["Date"] = pd.to_datetime(data["Date"], format="%b %d, %Y")  # Format: May 15, 2020
-
-        ## share value and dividend payment are on the same date
-        dub = data.duplicated(subset="Date", keep="first")
-
-        ## format dividend payments as a separat timeseries
-        dividend = data[dub][["Date", "Open"]].copy()
-
-        dividend["Dividend"] = dividend["Open"].apply(lambda x: float(x.split(" ")[0]))
-
-        dividend = dividend.drop(columns=["Open"])
-
-        dividend = dividend.set_index("Date")
-
-        ## keep share_values in a df without dividend payments
-        share_values = data.drop(data[dub].index)
-
-        mapper = {"Close*": "Close", "Adj Close**": "Adj_Close"}
-        share_values = share_values.rename(columns=mapper)
+    def build_request_url(self, base_url):
+        # examples
+        ## download url: https://query1.finance.yahoo.com/v7/finance/download/AAPL?period1=345427200&period2=1590883200&interval=1d&events=history
+        # rest url: https://finance.yahoo.com/quote/AAPL/history?period1=1521068400&period2=1590098400&interval=1d&filter=history&frequency=1d
 
 
-        share_values = share_values.set_index("Date")
+        request_url = base_url + "{sname}?period1" \
+                       "={p_start}&period2={p_end}&interval=1d".format(
+                sname=self.share_name_short,
+                p_start=int(self.period_start.timestamp()),
+                p_end=int(self.period_end.timestamp()))
 
-        float_columns = ["Open", "High", "Low", "Close", "Adj_Close"]
-        share_values[float_columns] = share_values[float_columns].astype(float)
-        share_values["Volume"] = share_values["Volume"].astype(int)
-
-        return share_values, dividend
+        return request_url
 
     def get_dividend(self):
 
@@ -93,9 +73,28 @@ class Yahoo_Finscraper:
         self.share_values["Open"].plot()
         plt.show()
 
-    def download_file(self):
+    def fetch_data(self, request_url):
 
-        #TODO download an read file
+        url_shares = request_url + "&events=history"
+        url_div = request_url + "&events=div"
 
-        # link: https://query1.finance.yahoo.com/v7/finance/download/AAPL?period1=345427200&period2=1590883200&interval=1d&events=history
+        response_shares = requests.get(url_shares, allow_redirects=False)
+        response_div = requests.get(url_div, allow_redirects=False)
 
+        byte_data_shares = BytesIO(response_shares.content)
+        byte_data_div = BytesIO(response_div.content)
+
+        data_shares = pd.read_csv(byte_data_shares)
+        data_div = pd.read_csv(byte_data_div)
+
+        # set index col
+        data_shares["Date"] = pd.to_datetime(data_shares["Date"])
+        # rename col
+        mapper = {"Adj Close": "Adj_Close"}
+        data_shares = data_shares.rename(columns=mapper)
+
+        # set index col
+        data_div["Date"] = pd.to_datetime(data_div["Date"])
+        data_div = data_div.set_index("Date")
+
+        return data_shares, data_div
