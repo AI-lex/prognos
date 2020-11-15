@@ -1,6 +1,6 @@
 
 
-from scraper import Yahoo_Finscraper
+from fin.scripts.res.scraper import Yahoo_Finscraper
 
 
 yfs = Yahoo_Finscraper("AAPL", "Apple", "15.04.2020", "22.05.2020")

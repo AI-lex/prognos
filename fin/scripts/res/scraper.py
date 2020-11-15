@@ -49,7 +49,6 @@ class Yahoo_Finscraper:
     def build_request_url(self, base_url):
         # examples
         ## download url: https://query1.finance.yahoo.com/v7/finance/download/AAPL?period1=345427200&period2=1590883200&interval=1d&events=history
-        # rest url: https://finance.yahoo.com/quote/AAPL/history?period1=1521068400&period2=1590098400&interval=1d&filter=history&frequency=1d
 
 
         request_url = base_url + "{sname}?period1" \
